@@ -55,7 +55,7 @@ export default function ({ isNative, timeout = 300 }) {
             setTimeout(function () { document.documentElement.removeChild(WVJBIframe) }, 0)
         }
 
-        let wrapCallback = one(function(bridge){
+        let wrapCallback = one(function (bridge) {
             return callback(bridge ? module : null)
         })
 
@@ -77,11 +77,8 @@ export default function ({ isNative, timeout = 300 }) {
     }
 
     Object.assign(module, {
-        ready() {
-            return new Promise(resolve => {
-                wakeUpJavascriptBridge(resolve)
-            })
-        }
+        ready: () => new Promise(resolve => wakeUpJavascriptBridge(resolve)),
+        getBridge: () => window.WebViewJavascriptBridge
     })
 
     return module
