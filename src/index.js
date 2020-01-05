@@ -101,7 +101,14 @@ export default function ({isNative, timeout = 0, debug = false, logger = 'hybrid
 
     function defaultDataParser(apiName, response) {
         try {
-            return JSON.parse(response)
+            let data = JSON.parse(response)
+            if (isObjectType(data, 'Object')) {
+                return data
+            } else {
+                return {
+                    message: data
+                }
+            }
         } catch (e) {
             logError(e)
             return {
