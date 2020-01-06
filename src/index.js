@@ -84,7 +84,7 @@ export default function ({isNative, timeout = 0, debug = false, logger = 'hybrid
         if (!native) {
             if (timeout) {
                 setTimeout(function () {
-                    log(`ready timeout`)
+                    log(`wakeup timeout`)
                     wrapCallback(getBridge())
                 }, timeout)
             } else {
@@ -106,11 +106,11 @@ export default function ({isNative, timeout = 0, debug = false, logger = 'hybrid
                 return data
             } else {
                 return {
-                    message: data
+                    message: response
                 }
             }
         } catch (e) {
-            logError(e)
+            logError(`${apiName} parse error:`, e)
             return {
                 message: response
             }
@@ -144,15 +144,22 @@ export default function ({isNative, timeout = 0, debug = false, logger = 'hybrid
             } = {}
         ) {
             log(`register api: ${apiName}`)
-            this[apiName] = (
-                params = {},
-                {
+            this[apiName] = (...args) => {
+                let params = {}
+                let options = {}
+                if (args.length === 1) {
+                    options = args[0]
+                } else if (args.length >= 2) {
+                    params = args[0]
+                    options = args[1]
+                }
+                let {
                     success = noop,
                     fail = noop,
                     complete = noop,
                     cancel = noop
-                } = {}
-            ) => {
+                } = options
+
                 let webData = beforeInvoke(apiName, params) || params
                 log(`invoke ${apiName}, params:`, webData)
 
@@ -163,7 +170,7 @@ export default function ({isNative, timeout = 0, debug = false, logger = 'hybrid
                         log(`${apiName} called, response:`, response)
                         // return a valid object contains native data
                         let nativeData = parseData(apiName, response)
-                        afterInvoke(apiName, nativeData)
+                        nativeData = afterInvoke(apiName, nativeData) || nativeData
                         log(`${apiName} data after invoke:`, nativeData)
 
                         let message = nativeData.message
