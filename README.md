@@ -22,7 +22,6 @@ sdk.ready().then(sdk => {
 ```
 npm install hybrid-jssdk-backbone --save
 ```
-暂时未发布，还不能使用上面的命令。
 
 ### 第一步：构造SDK实例
 ```js
