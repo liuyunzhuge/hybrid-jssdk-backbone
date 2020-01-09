@@ -1,11 +1,12 @@
-function isObjectType(param, type) {
+/* eslint-disable no-useless-escape */
+function isObjectType (param, type) {
     return Object.prototype.toString.call(param) === `[object ${type}]`
 }
 
-function noop() {
+function noop () {
 }
 
-function one(func) {
+function one (func) {
     let state = false
     let ret
     return function () {
@@ -24,8 +25,8 @@ export default function (
         logger = 'hybrid-jssdk'
     }
 ) {
-    function wakeUpJavascriptBridge(callback) {
-        function forAndroid(callback) {
+    function wakeUpJavascriptBridge (callback) {
+        function forAndroid (callback) {
             log(`wake up for android`)
             if (getBridge()) {
                 callback(getBridge())
@@ -40,7 +41,7 @@ export default function (
             }
         }
 
-        function forApple(callback) {
+        function forApple (callback) {
             log(`wake up for apple`)
             if (getBridge()) {
                 return callback(getBridge())
@@ -81,11 +82,11 @@ export default function (
         android ? forAndroid(wrapCallback) : forApple(wrapCallback)
     }
 
-    function getBridge() {
+    function getBridge () {
         return window.WebViewJavascriptBridge || null
     }
 
-    function toJson(data) {
+    function toJson (data) {
         try {
             return JSON.parse(data)
         } catch (e) {
@@ -94,7 +95,7 @@ export default function (
         }
     }
 
-    function defaultDataParser(apiName, response) {
+    function defaultDataParser (apiName, response) {
         try {
             let data = JSON.parse(response)
             if (isObjectType(data, 'Object')) {
@@ -112,26 +113,32 @@ export default function (
         }
     }
 
-    function log(...args) {
+    function log (...args) {
         if (debug) {
             console.log(`[${logger}]`, ...args)
         }
     }
 
-    function logError(...args) {
+    function logError (...args) {
         if (debug) {
             console.error(`[${logger}]`, ...args)
         }
     }
 
-    function createApi(apiName, {
+    function createApi (apiName, {
         beforeInvoke, parseData, afterInvoke
     }) {
         return function (...args) {
             let params = {}
             let options = {}
             if (args.length === 1) {
-                options = args[0]
+                ['success', 'fail', 'cancel', 'complete'].forEach(name => {
+                    if (isObjectType(args[0][name], 'Function')) {
+                        options[name] = args[0][name]
+                        delete args[0][name]
+                    }
+                })
+                params = args[0]
             } else if (args.length >= 2) {
                 params = args[0]
                 options = args[1]
@@ -165,10 +172,10 @@ export default function (
 
                     let semiIndex = message.indexOf(':')
                     switch (message.substring(semiIndex + 1)) {
-                        case "ok":
+                        case 'ok':
                             success(nativeData)
                             break
-                        case "cancel":
+                        case 'cancel':
                             cancel(nativeData)
                             break
                         default:
@@ -180,8 +187,8 @@ export default function (
         }
     }
 
-    const {navigator} = window
-    const {userAgent: ua} = navigator
+    const { navigator } = window
+    const { userAgent: ua } = navigator
     const android = !!(ua.match(/(Android);?[\s\/]+([\d.]+)?/))
     const osx = !!ua.match(/\(Macintosh; Intel /)
     const ipad = ua.match(/(iPad).*OS\s([\d_]+)/)
@@ -206,15 +213,15 @@ export default function (
         ready: () => wakeup,
         getBridge,
         toJson,
-        invoke(apiName, params, callback = noop) {
-            getBridge() ? getBridge().callHandler(apiName, params, callback) :
-                log(`invoke invalid`)
+        invoke (apiName, params, callback = noop) {
+            getBridge() ? getBridge().callHandler(apiName, params, callback)
+                : log(`invoke invalid`)
         },
-        register(apiName, response, callback = noop) {
-            getBridge() ? getBridge().registerHandler(apiName, response, callback) :
-                log(`register invalid`)
+        register (apiName, response, callback = noop) {
+            getBridge() ? getBridge().registerHandler(apiName, response, callback)
+                : log(`register invalid`)
         },
-        registerApi(
+        registerApi (
             apiName,
             {
                 parseData = defaultDataParser,
