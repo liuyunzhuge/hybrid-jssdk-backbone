@@ -53,7 +53,7 @@ const sdk = new HybridSdk({
 一定要在产品的第一版就往userAgent里注入产品标识，保证**isNative**能够准确判断是否是自身产品的webview环境。
 
 ### 第二步：注册一个api
-上一步构建出来的sdk，可通过`registerApi`来注册api
+上一步构建出来的sdk，可通过`registerApi`来注册api。注册的api是客户端提供给网页进行调用的，所以每一个api，都离不开客户端配合一起开发。
 ```js
 sdk.registerApi('openNativeView', {
     parseData(apiName, response) {
@@ -153,7 +153,7 @@ sdk.ready().then(sdk => {
     }
 })
 ```
-每一个api在注册后，都通过`sdk[apiName]`的方式调用，这个调用接收2个参数，第一个参数是api调用所需要的参数object，第二个参数是一个options对象，用来配置api调用的回调函数。所有通过`registerApi`注册的api，都采用相同的回调函数：`success fail cancel complete`，含义如其字面意思一样；这个函数也可以只传递一个参数，代表配置回调函数的options对象。
+每一个api在注册后，都通过`sdk[apiName]`的方式调用，这个调用接收2个参数，第一个参数是api调用所需要的参数object，第二个参数是一个options对象，用来配置api调用的回调函数。所有通过`registerApi`注册的api，都采用相同的回调函数：`success fail cancel complete`，含义如其字面意思一样；这个函数也可以只传递一个参数，把`success fail cancel complete`混合进第一个参数里面，在调用的时候，会把`success fail cancel complete`分离出来。
 
 另外`sdk`还提供了一个`ready`函数，这个函数调用后会返回一个`Promise`，在它的then回调内，可直接判断回调参数是否为真，继续是否进行native的调用。因为sdk内部需要初始化WebViewJavascriptBridge对象，而这个对象的注入过程是异步的，所以单独封装了一个`ready`函数。
 
@@ -179,3 +179,68 @@ iOS开发示例：
 
 * app端一定要通过userAgent注入产品标识
 * app端写api的回调数据，一定要转为json格式，且要包含`message`属性
+
+## 其它方法
+为了便于扩展，sdk还提供了以下几个实例方法：
+* getBridge()
+        
+    这个方法调用后返回底层的bridge对象，不过可能为空，所以要注意调用时机。
+
+* toJson(value: string)
+
+    这个方法调用后将传入的字符串进行`JSON.parse(value)`的转换，如果转换出错，则返回`null`，否则返回转换后的值。
+
+* invoke (apiName: string, params:object, callback:function)
+    
+    这个方法接收三个参数，通过`getBridge()`返回的`bridge`对象，直接调用客户端的api。 这是最直接、最原始的调用方式，所以这个方式调用客户端的api，不会有上面所有描述的那些服务。
+
+* register (apiName: string, response:string, callback:function)
+
+    这个方法接收三个参数，通过`getBridge()`返回的`bridge`对象，注册给客户端进行调用的前端的api。 注意是`前端的api`！因为网页提供方法给app调用的场景实际上并不多，所以本库也未对这样的场景进行过多的封装。但是也不排除有需要这个方式的场景，所以提供出来，方便扩展。下面介绍`eventBus`正好需要这个。
+
+## event-bus
+如果网页是一个单页应用，那么`event-bus`可能是需要的一个服务。我另外写的一个库[vue-event-bus](https://github.com/liuyunzhuge/vue-event-bus)提供了，在vue应用中，进行全局消息管理的能力。单纯地一个网页容器内，使用`event-bus`是不需要借助app提供服务的，那么当你想在app内，打开多个webview来展示产品场景呢？这时就得考虑要做横跨多个原生webview页面的event-bus处理了，因为从A页打开B页，然后B页里派发消息，需要A页面进行响应的场景，是非常常见的。
+
+如果想实现跨多页的event-bus，可以参考以下代码的做法：
+```js
+function randomString (t) {
+    return '.' + t.replace(/[xy]/g, function (c) {
+        const r = Math.random() * 16 | 0
+        const v = c === 'x' ? r : (r & 0x3 | 0x8)
+        return v.toString(16)
+    })
+}
+
+let pageId = randomString('xxxxxyyyyy')
+let webDispatchApi = 'webEventBusDispatch'
+let nativeDispatchApi = 'nativeEventBusDispatch'
+
+// 只有app版本支持以上两个api的时候，才能开放以下的功能
+const eventBus = Vue.prototype.$eventBus.core
+const trigger = eventBus.trigger.bind(eventBus)
+const webDispatch = sdk.registerApi(webDispatchApi).bind(sdk)
+
+sdk.register(nativeDispatchApi, (message, responseCallback) => {
+    let event = sdk.toJson(message)
+    // 如果消息是从自己所在的webview转发出来的，则下面的trigger不会处理
+    if (event.pageId !== pageId) {
+        trigger(event.type, ...(sdk.toJson(event.data)))
+    }
+    responseCallback(`${nativeDispatchApi}:ok`)
+})
+
+eventBus.trigger = (event, ...data) => {
+    // 让本webview内的eventBus保持正常的使用模式
+    trigger(event, ...data)
+
+    // 借助app作为跳板，将本webview内的消息派发到其它webview
+    webDispatch({
+        type: event,
+        pageId: pageId,
+        data: JSON.stringify(data)
+    }, {})
+}
+```
+这个做法依赖于app与网页之间，进行双向的api配置。首先app得给网页提供一个`webEventBusDispatch`的api，方便网页调用，网页利用这个api把网页内的event传给app；app在实现这个api的时候，利用app自己的`event-bus`（android）或者是`notification`（iOS）的能力，把这些消息派发给其它的webview页面；每个webview页面可以监听app自己在上一步派发的消息，并把这些数据再传回各自webview内的网页；如何传回呢？网页必须注册一个`nativeEventBusDispatch`的方法给app，这样app调用这个方法，就可以把数据传回来了。总之，这个方案的思路，就是利用app做跳板，把某个webview下的网页派发的消息，传递到其它webview页面，当然也包括消息源所在的webview。
+
+上面代码中，还有一个`pageId`的变量，这个变量，可以屏蔽掉网页派发给app，然后app又派发给自己的消息；毕竟在同一个webview内的消息传递，直接借助网页内`event-bus`本身的能力就够了。
