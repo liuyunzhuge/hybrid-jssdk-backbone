@@ -4,7 +4,7 @@
     (global = global || self, global.HybridJssdkBackbone = factory());
 }(this, (function () { 'use strict';
 
-    /* no-useless-escape */
+    /* eslint-disable no-useless-escape */
     function isObjectType(param, type) {
       return Object.prototype.toString.call(param) === "[object ".concat(type, "]");
     }
@@ -30,28 +30,6 @@
           debug = _ref$debug === void 0 ? false : _ref$debug,
           _ref$logger = _ref.logger,
           logger = _ref$logger === void 0 ? 'hybrid-jssdk' : _ref$logger;
-      var _window = window,
-          navigator = _window.navigator;
-      var ua = navigator.userAgent;
-      var android = !!ua.match(/(Android);?[\s\/]+([\d.]+)?/);
-      var osx = !!ua.match(/\(Macintosh; Intel /);
-      var ipad = ua.match(/(iPad).*OS\s([\d_]+)/);
-      var ipod = ua.match(/(iPod)(.*OS\s([\d_]+))?/);
-      var iphone = !ipad && ua.match(/(iPhone\sOS)\s([\d_]+)/);
-      var apple = !!(osx || ipad || ipod || iphone);
-
-      var _native = function () {
-        if (isObjectType(isNative, 'Function')) return !!isNative();
-        return false;
-      }();
-
-      var module = {};
-      log('env settings:', {
-        "native": _native,
-        android: android,
-        apple: apple,
-        timeout: timeout
-      });
 
       function wakeUpJavascriptBridge(callback) {
         function forAndroid(callback) {
@@ -114,6 +92,15 @@
         return window.WebViewJavascriptBridge || null;
       }
 
+      function toJson(data) {
+        try {
+          return JSON.parse(data);
+        } catch (e) {
+          logError(e);
+          return null;
+        }
+      }
+
       function defaultDataParser(apiName, response) {
         try {
           var data = JSON.parse(response);
@@ -141,7 +128,7 @@
             args[_key] = arguments[_key];
           }
 
-          (_console = console).log.apply(_console, [logger].concat(args));
+          (_console = console).log.apply(_console, ["[".concat(logger, "]")].concat(args));
         }
       }
 
@@ -153,87 +140,134 @@
             args[_key2] = arguments[_key2];
           }
 
-          (_console2 = console).error.apply(_console2, [logger].concat(args));
+          (_console2 = console).error.apply(_console2, ["[".concat(logger, "]")].concat(args));
         }
       }
 
+      function createApi(apiName, _ref2) {
+        var beforeInvoke = _ref2.beforeInvoke,
+            parseData = _ref2.parseData,
+            afterInvoke = _ref2.afterInvoke;
+        return function () {
+          for (var _len3 = arguments.length, args = new Array(_len3), _key3 = 0; _key3 < _len3; _key3++) {
+            args[_key3] = arguments[_key3];
+          }
+
+          var params = {};
+          var options = {};
+
+          if (args.length === 1) {
+            ['success', 'fail', 'cancel', 'complete'].forEach(function (name) {
+              if (isObjectType(args[0][name], 'Function')) {
+                options[name] = args[0][name];
+                delete args[0][name];
+              }
+            });
+            params = args[0];
+          } else if (args.length >= 2) {
+            params = args[0];
+            options = args[1];
+          }
+
+          var _options = options,
+              _options$success = _options.success,
+              success = _options$success === void 0 ? noop : _options$success,
+              _options$fail = _options.fail,
+              fail = _options$fail === void 0 ? noop : _options$fail,
+              _options$complete = _options.complete,
+              complete = _options$complete === void 0 ? noop : _options$complete,
+              _options$cancel = _options.cancel,
+              cancel = _options$cancel === void 0 ? noop : _options$cancel;
+          var webData = beforeInvoke(apiName, params) || params;
+          log("invoke ".concat(apiName, ", params:"), webData);
+          this.invoke(apiName, webData, function (response) {
+            log("".concat(apiName, " called, response:"), response); // return a valid object contains native data
+
+            var nativeData = parseData(apiName, response);
+            nativeData = afterInvoke(apiName, nativeData) || nativeData;
+            log("".concat(apiName, " data after invoke:"), nativeData);
+            var message = nativeData.message;
+            log("".concat(apiName, " message:"), nativeData.message);
+
+            if (!message) {
+              return;
+            }
+
+            var semiIndex = message.indexOf(':');
+
+            switch (message.substring(semiIndex + 1)) {
+              case 'ok':
+                success(nativeData);
+                break;
+
+              case 'cancel':
+                cancel(nativeData);
+                break;
+
+              default:
+                fail(nativeData);
+            }
+
+            complete(nativeData);
+          });
+        };
+      }
+
+      var _window = window,
+          navigator = _window.navigator;
+      var ua = navigator.userAgent;
+      var android = !!ua.match(/(Android);?[\s\/]+([\d.]+)?/);
+      var osx = !!ua.match(/\(Macintosh; Intel /);
+      var ipad = ua.match(/(iPad).*OS\s([\d_]+)/);
+      var ipod = ua.match(/(iPod)(.*OS\s([\d_]+))?/);
+      var iphone = !ipad && ua.match(/(iPhone\sOS)\s([\d_]+)/);
+      var apple = !!(osx || ipad || ipod || iphone);
+
+      var _native = function () {
+        if (isObjectType(isNative, 'Function')) return !!isNative();
+        return false;
+      }();
+
+      var module = {};
+      var wakeup = new Promise(function (resolve) {
+        return wakeUpJavascriptBridge(resolve);
+      });
+      log('env settings:', {
+        "native": _native,
+        android: android,
+        apple: apple,
+        timeout: timeout
+      });
       Object.assign(module, {
         ready: function ready() {
-          return new Promise(function (resolve) {
-            return wakeUpJavascriptBridge(resolve);
-          });
+          return wakeup;
         },
+        getBridge: getBridge,
+        toJson: toJson,
         invoke: function invoke(apiName, params) {
           var callback = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : noop;
           getBridge() ? getBridge().callHandler(apiName, params, callback) : log("invoke invalid");
         },
+        register: function register(apiName, response) {
+          var callback = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : noop;
+          getBridge() ? getBridge().registerHandler(apiName, response, callback) : log("register invalid");
+        },
         registerApi: function registerApi(apiName) {
-          var _this = this;
-
-          var _ref2 = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {},
-              _ref2$parseData = _ref2.parseData,
-              parseData = _ref2$parseData === void 0 ? defaultDataParser : _ref2$parseData,
-              _ref2$beforeInvoke = _ref2.beforeInvoke,
-              beforeInvoke = _ref2$beforeInvoke === void 0 ? noop : _ref2$beforeInvoke,
-              _ref2$afterInvoke = _ref2.afterInvoke,
-              afterInvoke = _ref2$afterInvoke === void 0 ? noop : _ref2$afterInvoke;
+          var _ref3 = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {},
+              _ref3$parseData = _ref3.parseData,
+              parseData = _ref3$parseData === void 0 ? defaultDataParser : _ref3$parseData,
+              _ref3$beforeInvoke = _ref3.beforeInvoke,
+              beforeInvoke = _ref3$beforeInvoke === void 0 ? noop : _ref3$beforeInvoke,
+              _ref3$afterInvoke = _ref3.afterInvoke,
+              afterInvoke = _ref3$afterInvoke === void 0 ? noop : _ref3$afterInvoke;
 
           log("register api: ".concat(apiName));
-
-          this[apiName] = function () {
-            var params = {};
-            var options = {};
-
-            if (arguments.length === 1) {
-              options = arguments.length <= 0 ? undefined : arguments[0];
-            } else if (arguments.length >= 2) {
-              params = arguments.length <= 0 ? undefined : arguments[0];
-              options = arguments.length <= 1 ? undefined : arguments[1];
-            }
-
-            var _options = options,
-                _options$success = _options.success,
-                success = _options$success === void 0 ? noop : _options$success,
-                _options$fail = _options.fail,
-                fail = _options$fail === void 0 ? noop : _options$fail,
-                _options$complete = _options.complete,
-                complete = _options$complete === void 0 ? noop : _options$complete,
-                _options$cancel = _options.cancel,
-                cancel = _options$cancel === void 0 ? noop : _options$cancel;
-            var webData = beforeInvoke(apiName, params) || params;
-            log("invoke ".concat(apiName, ", params:"), webData);
-
-            _this.invoke(apiName, webData, function (response) {
-              log("".concat(apiName, " called, response:"), response); // return a valid object contains native data
-
-              var nativeData = parseData(apiName, response);
-              nativeData = afterInvoke(apiName, nativeData) || nativeData;
-              log("".concat(apiName, " data after invoke:"), nativeData);
-              var message = nativeData.message;
-              log("".concat(apiName, " message:"), nativeData.message);
-
-              if (!message) {
-                return;
-              }
-
-              var semiIndex = message.indexOf(':');
-
-              switch (message.substring(semiIndex + 1)) {
-                case "ok":
-                  success(nativeData);
-                  break;
-
-                case "cancel":
-                  cancel(nativeData);
-                  break;
-
-                default:
-                  fail(nativeData);
-              }
-
-              complete(nativeData);
-            });
-          };
+          this[apiName] = createApi(apiName, {
+            parseData: parseData,
+            beforeInvoke: beforeInvoke,
+            afterInvoke: afterInvoke
+          });
+          return this[apiName];
         }
       });
       return module;

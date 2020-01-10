@@ -153,7 +153,28 @@ sdk.ready().then(sdk => {
     }
 })
 ```
-每一个api在注册后，都通过`sdk[apiName]`的方式调用，这个调用接收2个参数，第一个参数是api调用所需要的参数object，第二个参数是一个options对象，用来配置api调用的回调函数。所有通过`registerApi`注册的api，都采用相同的回调函数：`success fail cancel complete`，含义如其字面意思一样；这个函数也可以只传递一个参数，把`success fail cancel complete`混合进第一个参数里面，在调用的时候，会把`success fail cancel complete`分离出来。
+每一个api在注册后，都通过`sdk[apiName]`的方式调用，这个调用接收2个参数，第一个参数是api调用所需要的参数object，第二个参数是一个options对象，用来配置api调用的回调函数。所有通过`registerApi`注册的api，都采用相同的回调函数：`success fail cancel complete`，含义如其字面意思一样；这个函数也可以只传递一个参数，把`success fail cancel complete`混合进第一个参数里面，在调用的时候，会把`success fail cancel complete`分离出来，就像这样：
+```js
+sdk.ready().then(sdk => {
+    if(sdk) {
+        sdk.openNativeView({
+            link: '....',
+            success() {
+
+            },
+            fail() {
+
+            },
+            cancel() {
+
+            },
+            complete() {
+
+            }
+        });
+    }
+})
+```
 
 另外`sdk`还提供了一个`ready`函数，这个函数调用后会返回一个`Promise`，在它的then回调内，可直接判断回调参数是否为真，继续是否进行native的调用。因为sdk内部需要初始化WebViewJavascriptBridge对象，而这个对象的注入过程是异步的，所以单独封装了一个`ready`函数。
 
@@ -196,10 +217,10 @@ iOS开发示例：
 
 * register (apiName: string, response:string, callback:function)
 
-    这个方法接收三个参数，通过`getBridge()`返回的`bridge`对象，注册给客户端进行调用的前端的api。 注意是`前端的api`！因为网页提供方法给app调用的场景实际上并不多，所以本库也未对这样的场景进行过多的封装。但是也不排除有需要这个方式的场景，所以提供出来，方便扩展。下面介绍`eventBus`正好需要这个。
+    这个方法接收三个参数，通过`getBridge()`返回的`bridge`对象，注册给客户端进行调用的前端的api。 注意是`前端的api`！因为网页提供方法给app调用的场景实际上并不多，所以本库也未对这样的场景进行过多的封装。但是也不排除有需要这个方式的场景，所以提供出来，方便扩展。下面介绍`event-bus`正好需要这个。
 
 ## event-bus
-如果网页是一个单页应用，那么`event-bus`可能是需要的一个服务。我另外写的一个库[vue-event-bus](https://github.com/liuyunzhuge/vue-event-bus)提供了，在vue应用中，进行全局消息管理的能力。单纯地一个网页容器内，使用`event-bus`是不需要借助app提供服务的，那么当你想在app内，打开多个webview来展示产品场景呢？这时就得考虑要做横跨多个原生webview页面的event-bus处理了，因为从A页打开B页，然后B页里派发消息，需要A页面进行响应的场景，是非常常见的。
+如果网页是一个单页应用，那么`event-bus`可能是需要的一个服务。我另外写的一个库[vue-event-bus](https://github.com/liuyunzhuge/vue-event-bus)提供了在vue应用中进行全局消息管理的能力。单纯地一个网页容器内，使用`event-bus`是不需要借助app提供服务的，那么当你想在app内，打开多个webview来展示产品场景呢？这时就得考虑要做横跨多个原生webview页面的event-bus处理了，因为从A页打开B页，然后B页里派发消息，需要A页面进行响应的场景，是非常常见的。
 
 如果想实现跨多页的event-bus，可以参考以下代码的做法：
 ```js
