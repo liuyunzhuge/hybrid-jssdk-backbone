@@ -1,6 +1,6 @@
 {
   "name": "hybrid-jssdk-backbone",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A simple library that helps to build hybrid sdk of your products. ",
   "main": "dist/index.cjs.js",
   "module": "dist/index.esm.js",
