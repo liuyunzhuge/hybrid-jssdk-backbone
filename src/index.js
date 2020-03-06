@@ -20,7 +20,7 @@ function one (func) {
 export default function (
     {
         isNative,
-        timeout = 0,
+        timeout = 1500,
         debug = false,
         logger = 'hybrid-jssdk'
     }
@@ -68,15 +68,13 @@ export default function (
             return wrapCallback(getBridge())
         }
 
-        if (!native) {
-            if (timeout) {
-                setTimeout(function () {
-                    log(`wakeup timeout`)
-                    wrapCallback(getBridge())
-                }, timeout)
-            } else {
-                return wrapCallback(null)
-            }
+        if (timeout) {
+            setTimeout(function () {
+                log(`wakeup timeout`)
+                wrapCallback(getBridge())
+            }, timeout)
+        } else {
+            return wrapCallback(null)
         }
 
         android ? forAndroid(wrapCallback) : forApple(wrapCallback)

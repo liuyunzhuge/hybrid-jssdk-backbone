@@ -19,7 +19,7 @@ function one(func) {
 function index (_ref) {
   var isNative = _ref.isNative,
       _ref$timeout = _ref.timeout,
-      timeout = _ref$timeout === void 0 ? 0 : _ref$timeout,
+      timeout = _ref$timeout === void 0 ? 1500 : _ref$timeout,
       _ref$debug = _ref.debug,
       debug = _ref$debug === void 0 ? false : _ref$debug,
       _ref$logger = _ref.logger,
@@ -68,15 +68,13 @@ function index (_ref) {
       return wrapCallback(getBridge());
     }
 
-    if (!_native) {
-      if (timeout) {
-        setTimeout(function () {
-          log("wakeup timeout");
-          wrapCallback(getBridge());
-        }, timeout);
-      } else {
-        return wrapCallback(null);
-      }
+    if (timeout) {
+      setTimeout(function () {
+        log("wakeup timeout");
+        wrapCallback(getBridge());
+      }, timeout);
+    } else {
+      return wrapCallback(null);
     }
 
     android ? forAndroid(wrapCallback) : forApple(wrapCallback);
