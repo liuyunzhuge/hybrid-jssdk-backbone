@@ -34,6 +34,7 @@ export default function (
                 document.addEventListener(
                     'WebViewJavascriptBridgeReady'
                     , function () {
+                        log(`bridge for android`)
                         callback(getBridge())
                     },
                     false
@@ -49,7 +50,9 @@ export default function (
             if (window.WVJBCallbacks) {
                 return window.WVJBCallbacks.push(callback)
             }
-            window.WVJBCallbacks = [callback]
+            window.WVJBCallbacks = [function(){
+                log(`bridge for apple`)
+            }]
             let WVJBIframe = document.createElement('iframe')
             WVJBIframe.style.display = 'none'
             WVJBIframe.src = 'https://__bridge_loaded__'

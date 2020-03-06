@@ -39,6 +39,7 @@
             callback(getBridge());
           } else {
             document.addEventListener('WebViewJavascriptBridgeReady', function () {
+              log("bridge for android");
               callback(getBridge());
             }, false);
           }
@@ -55,7 +56,9 @@
             return window.WVJBCallbacks.push(callback);
           }
 
-          window.WVJBCallbacks = [callback];
+          window.WVJBCallbacks = [function () {
+            log("bridge for apple");
+          }];
           var WVJBIframe = document.createElement('iframe');
           WVJBIframe.style.display = 'none';
           WVJBIframe.src = 'https://__bridge_loaded__';
